@@ -2,6 +2,7 @@
 *.slo
 *.lo
 *.o
+*.res
 
 # Compiled Dynamic libraries
 *.so
@@ -24,7 +25,8 @@
 *.bak
 *.depend
 *.layout
-# *.zip
+*.zip
+*.7z
 
 ss/*
 *.Cache

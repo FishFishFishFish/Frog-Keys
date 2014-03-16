@@ -60,9 +60,9 @@
 std::vector<wchar_t*> keys;
 std::vector<wchar_t*> shiftkeys;
 
+bool shift;
 bool lshift;
 bool rshift;
-bool shift;
 
 HICON icon;
 
@@ -350,7 +350,15 @@ LRESULT CALLBACK handlekeys( int code, WPARAM wp, LPARAM lp ) {
                     printf( "%s down\n", tmp);
                 }
                 else{
-                    if (shift){
+//                    bool shif = GetKeyState(VK_RSHIFT) || GetKeyState(VK_LSHIFT);
+//
+//                    printf("\n-SHIFT: %i, %i\n", GetKeyState(VK_SHIFT) & 0x01, GetKeyState(VK_SHIFT) & 0x02);
+//                    printf("RSHIFT: %i, %i\n", GetKeyState(VK_RSHIFT) & 0x01, GetKeyState(VK_RSHIFT) & 0x02);
+//                    printf("LSHIFT: %i, %i\n", GetKeyState(VK_LSHIFT) & 0x01, GetKeyState(VK_LSHIFT) & 0x02);
+
+                    bool caps = (GetKeyState(VK_CAPITAL) & 0x01);
+                    bool upper = (caps && !shift) || (shift && !caps);
+                    if (upper){
                         for (int i = 1; i < shiftkeys.size(); i++){
                             if ((int)shiftkeys[i][0] == (int)key) { shown = shiftkeys[i]; }
                         }
@@ -685,6 +693,21 @@ int WINAPI WinMain( HINSTANCE thisinstance, HINSTANCE previnstance, LPSTR cmdlin
     windowclass.cbWndExtra = 0;
     windowclass.hbrBackground =  CreateSolidBrush( RGB( 255, 255, 255 ) );
 
+//    rshift = GetKeyState(VK_RSHIFT);
+//    lshift = GetKeyState(VK_LSHIFT);
+//    shift = lshift || rshift;
+
+
+
+    printf("\nCAPSLOCK: %i\n", GetKeyState(VK_CAPITAL));
+    GetKeyState(VK_CAPITAL);
+
+
+
+
+    //PBYTE kb[256];
+    //SetKeyboardState(*kb);
+
     if (!RegisterClassExW(&windowclass)){ printf("ERROR1"); }
 
     window.create(thisinstance, windowclass);
@@ -780,6 +803,8 @@ int WINAPI WinMain( HINSTANCE thisinstance, HINSTANCE previnstance, LPSTR cmdlin
     }
 
     Shell_NotifyIconW( NIM_DELETE, &nid );
+
+    Sleep(500);
 
     return 0;
 }
