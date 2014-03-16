@@ -91,6 +91,7 @@ struct WINDOW{
     WNDCLASSEX windowclass;
     HINSTANCE modulehandle;
     HRGN region;
+    int arrowOff;
 
     void create(HINSTANCE thisinstance, WNDCLASSEX windowclass);
     void setRegion();
@@ -104,8 +105,8 @@ struct WINDOW{
 void WINDOW::create(HINSTANCE thisinstance, WNDCLASSEX windowclass){
     HWND fgwindow = GetForegroundWindow();
 
-    hwnd = CreateWindowEx( WS_EX_TOOLWINDOW, CLASSNAME, WINDOWTITLE, WS_POPUP,
-                           CW_USEDEFAULT, CW_USEDEFAULT, 200, 200, HWND_DESKTOP, NULL,
+    hwnd = CreateWindowEx( WS_EX_TOOLWINDOW, CLASSNAME, WINDOWTITLE, WS_EX_LAYERED| WS_CLIPSIBLINGS | WS_CHILD,
+                           CW_USEDEFAULT, CW_USEDEFAULT, 200, 200, GetDesktopWindow(), NULL, //HWND_DESKTOP
                            thisinstance, NULL );
 
     if (!hwnd){ printf("ERROR2"); }
@@ -195,12 +196,25 @@ void WINDOW::show(){
 
         cursorWnd = info.hwndCaret;
 
-        under = (cursor.y < 200);
+        if (!cursorWnd){
+            printf("NO WINDOW!");
+            key = '\0';
+            shown = NULL;
+            hide();
+            return;
+        }
+        else{
+            SetForegroundWindow(cursorWnd);
+        }
+
+        under = (cursor.y < 2*BUTTON_H);
 
         width = num*(BUTTON_W + BUTTON_P) + BUTTON_P;
 
         topLeft.x = cursor.x - width/2;
         topLeft.y = cursor.y + (under)*(h + BUTTON_P + DISTANCE) - (!under)*(h + BUTTON_H + BUTTON_P + DISTANCE);
+
+
 
 //        topLeft.x = 0;
 //        topLeft.y = 0;
@@ -258,11 +272,6 @@ void replaceChar(wchar_t unicode){
 
     input.ki.dwFlags |= KEYEVENTF_KEYUP;
     SendInput( 1, &input, sizeof( INPUT ) );
-
-    key = '\0';
-    shown = NULL;
-
-    window.hide();
 }
 
 LRESULT CALLBACK handlekeys( int code, WPARAM wp, LPARAM lp ) {
@@ -306,7 +315,16 @@ LRESULT CALLBACK handlekeys( int code, WPARAM wp, LPARAM lp ) {
                     else{
                         wprintf(L"%lc", shown[num]);
 
-                        replaceChar(shown[num]);
+                        GUITHREADINFO info;
+                        info.cbSize = sizeof(GUITHREADINFO);
+                        GetGUIThreadInfo(NULL, &info);
+
+                        if (window.cursorWnd == info.hwndCaret){ replaceChar(shown[num]); }
+
+                        key = '\0';
+                        shown = NULL;
+
+                        window.hide();
 
                         return 1;
                     }
@@ -435,9 +453,9 @@ LRESULT CALLBACK windowprocedure( HWND hwnd, UINT msg, WPARAM wparam, LPARAM lpa
                                              hwnd,(HMENU)B_[i], GetModuleHandle(NULL), NULL);
             }
             break;
-//        case WM_SETFOCUS:
-//            SetForegroundWindow((HWND)wparam);
-//            break;
+        case WM_SETFOCUS:
+            SetFocus((HWND)wparam);
+            return 0;
         case WM_COMMAND:
             n = 0;
             switch(LOWORD(wparam)) {
@@ -451,7 +469,7 @@ LRESULT CALLBACK windowprocedure( HWND hwnd, UINT msg, WPARAM wparam, LPARAM lpa
                 case B_1: n++;
                 break;
             }
-            if (n){ replaceChar(shown[n-1]); }
+            if (n){ replaceChar(shown[n]); }
             break;
         case WM_DESTROY:
             break;
