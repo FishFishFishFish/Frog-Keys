@@ -98,6 +98,7 @@ struct WINDOW{
     HWND hwnd;
     POINT cursor;
     HWND cursorWnd;
+    HWND cursorParentWnd;
     POINT topLeft;
     bool under;
     //MSG msg;
@@ -207,6 +208,7 @@ void WINDOW::show(){
 //        printf("h=%i\n", h);
 
         cursorWnd = info.hwndCaret;
+        cursorParentWnd = info.hwndActive;
 
         if (!cursorWnd){
             printf("NO WINDOW!");
@@ -216,7 +218,8 @@ void WINDOW::show(){
             return;
         }
         else{
-            SetForegroundWindow(cursorWnd);
+            //SetForegroundWindow(cursorWnd);
+            SetForegroundWindow(cursorParentWnd);
         }
 
         under = (cursor.y < 2*BUTTON_H);
@@ -701,9 +704,6 @@ int WINAPI WinMain( HINSTANCE thisinstance, HINSTANCE previnstance, LPSTR cmdlin
 
     printf("\nCAPSLOCK: %i\n", GetKeyState(VK_CAPITAL));
     GetKeyState(VK_CAPITAL);
-
-
-
 
     //PBYTE kb[256];
     //SetKeyboardState(*kb);
