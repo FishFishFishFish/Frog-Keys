@@ -42,9 +42,10 @@
 // Internal dependencies
 //#include "window.h"
 
-#define BUTTON_W 18
-#define BUTTON_H 40
-#define BUTTON_P 02
+#define BUTTON_W 16
+#define BUTTON_H 36
+#define BUTTON_P 00
+#define BUTTON_O 01
 #define DISTANCE 10
 
 #define ICON_MESSAGE    (WM_USER + 1)
@@ -220,17 +221,17 @@ void WINDOW::show(){
 
         under = (cursor.y < 2*BUTTON_H);
 
-        width = num*(BUTTON_W + BUTTON_P) + BUTTON_P;
+        width = num*(BUTTON_W + BUTTON_P) - BUTTON_P + 2*BUTTON_O;
 
         topLeft.x = cursor.x - width/2;
-        topLeft.y = cursor.y + (under)*(h + BUTTON_P + DISTANCE) - (!under)*(h + BUTTON_H + BUTTON_P + DISTANCE);
+        topLeft.y = cursor.y + (under)*(h + DISTANCE) - (!under)*(h + BUTTON_H + 2*BUTTON_O + DISTANCE);
 
 //        topLeft.x = 0;
 //        topLeft.y = 0;
 
         ShowWindow(hwnd, SW_SHOW);
 
-        SetWindowPos(hwnd, HWND_TOPMOST, topLeft.x, topLeft.y,  width, BUTTON_H + 2*BUTTON_P, SWP_SHOWWINDOW);
+        SetWindowPos(hwnd, HWND_TOPMOST, topLeft.x, topLeft.y,  width, BUTTON_H + 2*BUTTON_O, SWP_SHOWWINDOW);
 
         setButtons();
         setRegion();
@@ -284,7 +285,7 @@ void replaceChar(wchar_t unicode){
 }
 
 LRESULT CALLBACK handlekeys( int code, WPARAM wp, LPARAM lp ) {
-    if (code == HC_ACTION && ( (wp == WM_KEYUP) || (wp == WM_KEYDOWN) )){
+    if (code == HC_ACTION && ( (wp == WM_SYSKEYUP || wp == WM_KEYUP) || (wp == WM_SYSKEYDOWN || wp == WM_KEYDOWN) )){
         char tmp[0xFF] = {'\0'};
         DWORD msg = 1;
         KBDLLHOOKSTRUCT st_hook = *( ( KBDLLHOOKSTRUCT* )lp );
@@ -293,7 +294,7 @@ LRESULT CALLBACK handlekeys( int code, WPARAM wp, LPARAM lp ) {
         //msg += ( st_hook.flags << 24 );
         GetKeyNameText( msg, tmp, 0xFF );
 
-        if (wp == WM_KEYUP){
+        if (wp == WM_SYSKEYUP || wp == WM_KEYUP){
 
             if      (!strcmp("Shift", tmp)) {       lshift = false; shift = lshift || rshift; }
             else if (!strcmp("Right Shift", tmp)) { rshift = false; shift = lshift || rshift; }
@@ -302,7 +303,7 @@ LRESULT CALLBACK handlekeys( int code, WPARAM wp, LPARAM lp ) {
                 if (!shown){ key = '\0'; }
             }
         }
-        else if (wp == WM_KEYDOWN) {
+        else if (wp == WM_SYSKEYDOWN || wp == WM_KEYDOWN) {
             if      (!strcmp("Shift", tmp)) {       lshift = true; shift = lshift || rshift; }
             else if (!strcmp("Right Shift", tmp)) { rshift = true; shift = lshift || rshift; }
             else if (shown && tmp[1] == '\0'){
@@ -440,28 +441,33 @@ LRESULT CALLBACK windowprocedure( HWND hwnd, UINT msg, WPARAM wparam, LPARAM lpa
     switch ( msg ) {
 //        case WM_ERASEBKGND:
 //            return (LRESULT)1;
-//        case WM_PAINT:
-//            hdc = BeginPaint(hwnd, &ps);
-//
-////            GetClientRect(hwnd, &rect);
-////            region = CreateRectRgnIndirect(&rect);
-////            hBrush = CreateSolidBrush(RGB(255,255,255));
-////            FillRgn(hdc, region, hBrush);
-//
+        case WM_PAINT:
+            hdc = BeginPaint(hwnd, &ps);
+
+            GetClientRect(hwnd, &rect);
+            region = CreateRectRgnIndirect(&rect);
+            hBrush = CreateSolidBrush(RGB(106,162,231));
+            FrameRgn(hdc, region, hBrush,1,1);
+
 //            FillRgn(hdc, window.region, CreateSolidBrush(RGB(255,255,255)));
 //            FrameRgn(hdc, window.region, CreateSolidBrush(RGB(200,200,200)),2,2);
-//
-//            EndPaint(hwnd, &ps);
-//            break;
+
+            EndPaint(hwnd, &ps);
+            break;
         case WM_CLOSE:
             running = false;
             DestroyWindow(window.hwnd);
             return 0;
         case WM_CREATE:
+            HFONT font;
+            font = CreateFontW(14, 0, 0, 0, 400, 0, 0, 0, 0, 0, 0, ANTIALIASED_QUALITY, 0, L"Arial");
+
+
             for (int i = 0; i < 8; i++){
-                window.B[i] = CreateWindowExW(0, L"BUTTON", L" ", BS_DEFPUSHBUTTON | WS_CHILD | WS_VISIBLE | BS_MULTILINE,
-                                             BUTTON_P + (BUTTON_P + BUTTON_W)*i, BUTTON_P, BUTTON_W, BUTTON_H,
+                window.B[i] = CreateWindowExW(0, L"BUTTON", L" ", BS_TEXT | BS_DEFPUSHBUTTON | WS_CHILD | WS_VISIBLE | BS_MULTILINE,
+                                             BUTTON_O + (BUTTON_P + BUTTON_W)*i, BUTTON_O, BUTTON_W, BUTTON_H,
                                              hwnd,(HMENU)B_[i], GetModuleHandle(NULL), NULL);
+                SendMessage(window.B[i], WM_SETFONT, (WPARAM) font, 0);
             }
 
             menu = CreatePopupMenu();
