@@ -1,4 +1,7 @@
 #undef __STRICT_ANSI__
+#define WINVER 0x0501
+#define WIN32_LEAN_AND_MEAN
+//#define NOWINABLE
 
 // Standard C Libraries
 #include <stdlib.h>
@@ -19,28 +22,27 @@
 #include <stack>
 
 // Disgusting Windows Libraries
-//#define UNICODE
-#ifndef _WIN32_IE
-#define _WIN32_IE 0x0600
-#endif
-#define _WIN32_WINNT 0x0500
-#define WIN32_LEAN_AND_MEAN
 #include <windows.h>
-#include <mmsystem.h>
-#include <Windowsx.h>
-#include <commctrl.h>
-#include <shellapi.h>
-#include <Shlwapi.h>
-#include <process.h>
-#include <Winuser.h>
-#include <direct.h>
+#include <winuser.h>
+
+WINUSERAPI BOOL WINAPI GetGUIThreadInfo(DWORD,LPGUITHREADINFO);
+
+//#include <mmsystem.h>
+//#include <Windowsx.h>
+//#include <commctrl.h>
+//#include <shellapi.h>
+//#include <Shlwapi.h>
+//#include <process.h>
+//#include <Winuser.h>
+//#include <direct.h>
 
 // Internal dependencies
 //#include "window.h"
 
-#define BUTTON_W 24
-#define BUTTON_H 48
-#define BUTTON_P 04
+#define BUTTON_W 18
+#define BUTTON_H 40
+#define BUTTON_P 02
+#define DISTANCE 10
 
 #define CLASSNAME       "KeyPress"
 #define WINDOWTITLE     "KeyPress"
@@ -80,6 +82,8 @@ struct WINDOW{
     int b;
 
     HWND hwnd;
+    POINT cursor;
+    HWND cursorWnd;
     POINT topLeft;
     bool under;
     //MSG msg;
@@ -91,7 +95,7 @@ struct WINDOW{
     void create(HINSTANCE thisinstance, WNDCLASSEX windowclass);
     void setRegion();
     void setButtons();
-    void show(POINT showAt);
+    void show();
     void hide();
 };
 
@@ -116,7 +120,7 @@ void WINDOW::create(HINSTANCE thisinstance, WNDCLASSEX windowclass){
 }
 void WINDOW::setRegion(){
     //region = CreateRoundRectRgn(0, 0, width, BUTTON_H + 2*BUTTON_P, BUTTON_P, BUTTON_P);
-    HRGN rect = CreateRoundRectRgn(0, 0, width, BUTTON_H + 2*BUTTON_P, BUTTON_P, BUTTON_P);
+    HRGN rect = CreateRoundRectRgn(0, 0, width, BUTTON_H + 2*BUTTON_P, BUTTON_P, 4*BUTTON_P);
     //HRGN rect = CreateRoundRectRgn(topLeft.x, topLeft.y, topLeft.x + width, topLeft.y + BUTTON_H + 2*BUTTON_P, BUTTON_P, BUTTON_P);
 
     POINT p1, p2, p3;
@@ -127,17 +131,17 @@ void WINDOW::setRegion(){
 
         p3 = p2 = p1;
 
-        p1.x -= BUTTON_P;
-        p2.x += BUTTON_P;
-        p3.y += BUTTON_P;
+        p1.x -= 4*BUTTON_P;
+        p2.x += 4*BUTTON_P;
+        p3.y += 4*BUTTON_P;
     }
     const POINT points[3] = {p1,p2,p3};
     HRGN arrow = CreatePolygonRgn(points, 3, WINDING);
 
     CombineRgn(region, rect, arrow, RGN_OR);
 
-    DeleteObject(rect);
-    DeleteObject(arrow);
+    //DeleteObject(rect);
+    //DeleteObject(arrow);
 
     SetWindowRgn(hwnd, region, true);
 }
@@ -156,7 +160,7 @@ void WINDOW::setButtons(){
         }
     }
 }
-void WINDOW::show(POINT showAt){
+void WINDOW::show(){
     if (!shown){ return; }
 
     num = 0;
@@ -167,21 +171,48 @@ void WINDOW::show(POINT showAt){
     printf("num: %i", num);
 
     if (num){
-        if (showAt.y < 200){ under = true; }
+        GUITHREADINFO info;
+        info.cbSize = sizeof(GUITHREADINFO);
+
+        GetGUIThreadInfo(NULL, &info);
+
+        RECT rect = info.rcCaret;
+
+        RECT rectWnd;
+
+        GetWindowRect(info.hwndCaret, &rectWnd);
+
+        cursor.x = rectWnd.left + (rect.left + rect.right)/2;
+        cursor.y = rectWnd.top  + (rect.bottom + rect.top)/2;
+
+        int h = (rect.bottom - rect.top)/2;
+
+        printf("l=%i, r=%i, t=%i, b=%i\n", rect.left, rect.right, rect.top, rect.bottom);
+
+        printf("x=%i, y=%i\n", cursor.x, cursor.y);
+
+        printf("h=%i\n", h);
+
+        cursorWnd = info.hwndCaret;
+
+        under = (cursor.y < 200);
 
         width = num*(BUTTON_W + BUTTON_P) + BUTTON_P;
 
-        topLeft.x = showAt.x - width/2;
-        topLeft.y = showAt.y - (!under)*(BUTTON_H + BUTTON_P);
+        topLeft.x = cursor.x - width/2;
+        topLeft.y = cursor.y + (under)*(h + BUTTON_P + DISTANCE) - (!under)*(h + BUTTON_H + BUTTON_P + DISTANCE);
+
+//        topLeft.x = 0;
+//        topLeft.y = 0;
 
         ShowWindow(hwnd, SW_SHOW);
 
-        SetWindowPos(hwnd, HWND_TOPMOST, topLeft.x, topLeft.y,  width, BUTTON_H + BUTTON_P, SWP_SHOWWINDOW);
+        SetWindowPos(hwnd, HWND_TOPMOST, topLeft.x, topLeft.y,  width, BUTTON_H + 2*BUTTON_P, SWP_SHOWWINDOW);
 
         setButtons();
-        setRegion();
+        //setRegion();
 
-        RedrawWindow(hwnd, NULL, NULL, RDW_INVALIDATE);
+        RedrawWindow(hwnd, NULL, region, RDW_INVALIDATE);
         UpdateWindow(hwnd);
 
         for (int i = 0; i < 8; i++){
@@ -198,7 +229,6 @@ void WINDOW::hide(){
 }
 
 WINDOW window;
-
 
 void replaceChar(wchar_t unicode){
     INPUT input;
@@ -249,13 +279,13 @@ LRESULT CALLBACK handlekeys( int code, WPARAM wp, LPARAM lp ) {
 
             if      (!strcmp("Shift", tmp)) {       lshift = false; shift = lshift || rshift; }
             else if (!strcmp("Right Shift", tmp)) { rshift = false; shift = lshift || rshift; }
-            else if  (key == tmp[0] && tmp[1] == '\0') {
+            else if (key == tmp[0] && tmp[1] == '\0') {
                 printf( "%s up\n", tmp);
+                if (!shown){ key = '\0'; }
             }
         }
         else if (wp == WM_KEYDOWN) {
-            if (!strcmp("Esc", tmp)) { key = '\0'; shown = NULL; window.hide(); }
-            else if (!strcmp("Shift", tmp)) {       lshift = true; shift = lshift || rshift; }
+            if      (!strcmp("Shift", tmp)) {       lshift = true; shift = lshift || rshift; }
             else if (!strcmp("Right Shift", tmp)) { rshift = true; shift = lshift || rshift; }
             else if (shown && tmp[1] == '\0'){
                 //printf( "%s down\n", tmp);
@@ -305,11 +335,16 @@ LRESULT CALLBACK handlekeys( int code, WPARAM wp, LPARAM lp ) {
 
                     if (shown){
                         printf("RECOGNIZED!!!\n");
-                        POINT p; p.x = 200; p.y = 200;
-                        window.show(p);
+                        window.show();
                         return 1;
                     }
                 }
+            }
+            else{
+                key = '\0';
+                shown = NULL;
+
+                window.hide();
             }
         }
     }
@@ -338,7 +373,16 @@ void sayString( std::string str, std::string title ) {
 */
 
 void GUIThread( void* ) {
+    POINT p;
     while( running ) {
+        if (GetCaretPos(&p)){
+            printf("x=%i, y=%i\n", p.x, p.y);
+        }
+        else{
+            printf("Carot not found...\n");
+        }
+
+        Sleep(500);
 
 //        time_t current;
 //        time(&current);
@@ -347,14 +391,13 @@ void GUIThread( void* ) {
     }
 }
 
-
 LRESULT CALLBACK windowprocedure( HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam ) {
     //printf("HERE!!!");
 
     POINT curPoint;
     UINT clicked;
 
-    static int passargs[4] = {0, 0, 0, 0};
+    //static int passargs[4] = {0, 0, 0, 0};
 
     PAINTSTRUCT ps;
     HDC hdc;
@@ -589,8 +632,6 @@ int WINAPI WinMain( HINSTANCE thisinstance, HINSTANCE previnstance, LPSTR cmdlin
 
     window.create(thisinstance, windowclass);
 
-    wchar_t c;
-
     FILE* f = fopen("keys.txt", "rb");
     if (!f){ printf("FILE DOES NOT EXIST!"); return 0; }
 
@@ -655,7 +696,7 @@ int WINAPI WinMain( HINSTANCE thisinstance, HINSTANCE previnstance, LPSTR cmdlin
 
     //sayString( "started...", "Startup" );
 
-    _beginthread( GUIThread, 1000, NULL );
+    //_beginthread( GUIThread, 1000, NULL );
     //GUIThread(0);
 
     while ( running ) {
