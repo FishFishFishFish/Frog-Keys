@@ -1,260 +1,39 @@
 #undef __STRICT_ANSI__
 #define _UNICODE
-
-//#pragma comment(linker,"/manifestdependency:\"type='win32' name='Microsoft.Windows.Common-Controls' version='6.0.0.0' processorArchitecture='*' publicKeyToken='6595b64144ccf1df' language='*'\"")
-
 #define WINVER 0x0501
 #define _WIN32_WINNT 0x0501
 #define WIN32_LEAN_AND_MEAN
-//#define NOWINABLE
 
 // Standard C Libraries
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdarg.h>
-#include <malloc.h>
-#include <memory.h>
-#include <string>
-//#include <tchar.h>
 #include <wchar.h>
-#include <ctime>
-#include <cstring>
-#include <cctype>
-#include <string>
-#include <map>
 #include <vector>
-#include <deque>
-#include <stack>
 
 // Disgusting Windows Libraries
 #include <windows.h>
 #include <winuser.h>
-
-//#include <mmsystem.h>
-//#include <Windowsx.h>
-//#include <commctrl.h>
-//#include <shellapi.h>
 #include <Shlwapi.h>
-//#include <process.h>
-//#include <Winuser.h>
-//#include <direct.h>
 
 // Internal dependencies
-//#include "window.h"
+#include "file.h"
+#include "window.h"
 
-#define BUTTON_W 16
-#define BUTTON_H 36
-#define BUTTON_P 00
-#define BUTTON_O 01
-#define DISTANCE 10
-
-#define ICON_MESSAGE    (WM_USER + 1)
-
-#define MENU_NAME 3000
-#define MENU_EXIT 3001
-
-#define CLASSNAME       L"KeyPress"
-#define WINDOWTITLE     L"KeyPress"
-
-
-std::vector<wchar_t*> keys;
-std::vector<wchar_t*> shiftkeys;
 
 bool shift;
 bool lshift;
 bool rshift;
 
-HICON icon;
-
-HMENU menu;
-
 char key;
 wchar_t* shown;
+KEYS keys;
 
 HHOOK kHook;
 bool running;
 MSG msg;
 
-enum{
-    B_1 = 101,
-    B_2,
-    B_3,
-    B_4,
-    B_5,
-    B_6,
-    B_7,
-    B_8
-};
-
-const int B_[8] = {B_1, B_2, B_3, B_4, B_5, B_6, B_7, B_8};
-
-struct WINDOW{
-    int num;
-    HWND B[8];
-
-    int width;
-    int b;
-
-    HWND hwnd;
-    POINT cursor;
-    RECT cursorRect;
-    HWND cursorWnd;
-    HWND cursorParentWnd;
-    POINT topLeft;
-    bool under;
-    //MSG msg;
-
-    WNDCLASSEXW windowclass;
-    HINSTANCE modulehandle;
-    HRGN region;
-    int arrowOff;
-
-    void create(HINSTANCE thisinstance, WNDCLASSEXW windowclass);
-    void setRegion();
-    void setButtons();
-    void show();
-    void hide();
-};
-
-//#include "window.h"
-
-void WINDOW::create(HINSTANCE thisinstance, WNDCLASSEXW windowclass){
-    HWND fgwindow = GetForegroundWindow();
-
-    hwnd = CreateWindowExW( WS_EX_TOOLWINDOW, CLASSNAME, WINDOWTITLE, WS_EX_LAYERED| WS_CLIPSIBLINGS | WS_CHILD,
-                           CW_USEDEFAULT, CW_USEDEFAULT, 200, 200, GetDesktopWindow(), NULL, //HWND_DESKTOP
-                           thisinstance, NULL );
-
-    if (!hwnd){ printf("ERROR2"); }
-
-    hide();
-
-    SetForegroundWindow( fgwindow );
-
-    b = 0;
-
-    modulehandle = GetModuleHandle( NULL );
-}
-void WINDOW::setRegion(){
-    //region = CreateRoundRectRgn(0, 0, width, BUTTON_H + 2*BUTTON_P, BUTTON_P, BUTTON_P);
-    HRGN rect = CreateRoundRectRgn(0, 0, width, BUTTON_H + 2*BUTTON_P, 4*BUTTON_P, 4*BUTTON_P);
-    //HRGN rect = CreateRoundRectRgn(topLeft.x, topLeft.y, topLeft.x + width, topLeft.y + BUTTON_H + 2*BUTTON_P, BUTTON_P, BUTTON_P);
-
-    POINT p1, p2, p3;
-
-    if (!under){
-        p1.x = width/2;
-        p1.y = BUTTON_H + 2*BUTTON_P;
-
-        p3 = p2 = p1;
-
-        p1.x -= 4*BUTTON_P;
-        p2.x += 4*BUTTON_P;
-        p3.y += 4*BUTTON_P;
-    }
-    const POINT points[3] = {p1,p2,p3};
-    HRGN arrow = CreatePolygonRgn(points, 3, WINDING);
-
-    CombineRgn(region, rect, arrow, RGN_OR);
-
-    //DeleteObject(rect);
-    //DeleteObject(arrow);
-
-    SetWindowRgn(hwnd, region, true);
-}
-void WINDOW::setButtons(){
-    if (shown){
-        wchar_t str[8];
-        for (int i = 0; i < 8; i++){
-            if (i < num){
-                swprintf(str, L"%lc\n%i", shown[i+1], i+1);
-                SetWindowTextW(B[i], str);
-            }
-            else {
-                swprintf(str, L" ");
-                SetWindowTextW(B[i], str);
-            }
-        }
-    }
-}
-void WINDOW::show(){
-    if (!shown){ return; }
-
-    num = 0;
-    while (shown[num+1]){
-        num++;
-    }
-
-    printf("num: %i", num);
-
-    if (num){
-        GUITHREADINFO info;
-        info.cbSize = sizeof(GUITHREADINFO);
-
-        GetGUIThreadInfo(NULL, &info);
-
-        cursorRect = info.rcCaret;
-
-        RECT rectWnd;
-
-        GetWindowRect(info.hwndCaret, &rectWnd);
-
-        cursor.x = rectWnd.left + (cursorRect.left + cursorRect.right)/2;
-        cursor.y = rectWnd.top  + (cursorRect.bottom + cursorRect.top)/2;
-
-        int h = (cursorRect.bottom - cursorRect.top)/2;
-
-//        printf("l=%i, r=%i, t=%i, b=%i\n", rect.left, rect.right, rect.top, rect.bottom);
-//        printf("x=%i, y=%i\n", cursor.x, cursor.y);
-//        printf("h=%i\n", h);
-
-        cursorWnd = info.hwndCaret;
-        cursorParentWnd = info.hwndActive;
-
-        if (!cursorWnd){
-            printf("NO WINDOW!");
-            key = '\0';
-            shown = NULL;
-            hide();
-            return;
-        }
-        else{
-            //SetForegroundWindow(cursorWnd);
-            SetForegroundWindow(cursorParentWnd);
-        }
-
-        under = (cursor.y < 2*BUTTON_H);
-
-        width = num*(BUTTON_W + BUTTON_P) - BUTTON_P + 2*BUTTON_O;
-
-        topLeft.x = cursor.x - width/2;
-        topLeft.y = cursor.y + (under)*(h + DISTANCE) - (!under)*(h + BUTTON_H + 2*BUTTON_O + DISTANCE);
-
-//        topLeft.x = 0;
-//        topLeft.y = 0;
-
-        ShowWindow(hwnd, SW_SHOW);
-
-        SetWindowPos(hwnd, HWND_TOPMOST, topLeft.x, topLeft.y,  width, BUTTON_H + 2*BUTTON_O, SWP_SHOWWINDOW);
-
-        setButtons();
-        setRegion();
-
-        //RedrawWindow(hwnd, NULL, region, RDW_INVALIDATE);
-        UpdateWindow(hwnd);
-
-        for (int i = 0; i < 8; i++){
-            if (i < num){   ShowWindow(B[i], SW_SHOW); }
-            else{           ShowWindow(B[i], SW_HIDE); }
-            UpdateWindow(B[i]);
-        }
-    }
-}
-void WINDOW::hide(){
-    ShowWindow(hwnd, SW_HIDE);
-    SetWindowPos(hwnd, HWND_TOPMOST, GetSystemMetrics( SM_CXVIRTUALSCREEN ), 0, 20, 20, 0);
-    UpdateWindow(hwnd);
-}
+LRESULT CALLBACK windowprocedure( HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam );
 
 WINDOW window;
 
@@ -266,12 +45,9 @@ void replaceChar(wchar_t unicode){
     input.ki.wVk = VK_BACK;
     input.ki.dwFlags = 0;
     input.ki.wScan = 14;
-
     SendInput( 1, &input, sizeof( INPUT ) );
-
     input.ki.dwFlags |= KEYEVENTF_KEYUP;
     SendInput( 1, &input, sizeof( INPUT ) );
-
 
     input.type = INPUT_KEYBOARD;
     input.ki.time = 0;
@@ -279,11 +55,7 @@ void replaceChar(wchar_t unicode){
     input.ki.wVk = 0;
     input.ki.dwFlags = KEYEVENTF_UNICODE;
     input.ki.wScan = unicode;
-
-    printf("%i", (int)(char)unicode);
-
     SendInput( 1, &input, sizeof( INPUT ) );
-
     input.ki.dwFlags |= KEYEVENTF_KEYUP;
     SendInput( 1, &input, sizeof( INPUT ) );
 }
@@ -315,8 +87,8 @@ LRESULT CALLBACK handlekeys( int code, WPARAM wp, LPARAM lp ) {
                 if (key != tmp[0]) {
                     int num = 0;
 
-                    for (int i = 1; i < 9 && shown[i] && keys[0][i]; i++){
-                        if ((char)keys[0][i] == tmp[0]){ num = i; printf("HERE!!!"); }
+                    for (int i = 1; i < 9 && shown[i] && keys.command[i]; i++){
+                        if ((char)keys.command[i] == tmp[0]){ num = i; printf("HERE!!!"); }
                     }
 
                     if (!num){
@@ -365,16 +137,8 @@ LRESULT CALLBACK handlekeys( int code, WPARAM wp, LPARAM lp ) {
 
                     bool caps = (GetKeyState(VK_CAPITAL) & 0x01);
                     bool upper = (caps && !shift) || (shift && !caps);
-                    if (upper){
-                        for (int i = 1; i < shiftkeys.size(); i++){
-                            if ((int)shiftkeys[i][0] == (int)key) { shown = shiftkeys[i]; }
-                        }
-                    }
-                    else{
-                        for (int i = 1; i < keys.size(); i++){
-                            if ((int)keys[i][0] == (int)key + 32) { shown = keys[i]; }
-                        }
-                    }
+
+                    keys.search(upper, key, &shown);
 
                     if (shown){
                         printf("RECOGNIZED!!!\n");
@@ -395,45 +159,6 @@ LRESULT CALLBACK handlekeys( int code, WPARAM wp, LPARAM lp ) {
     return CallNextHookEx(kHook, code, wp, lp);
 }
 
-
-/*
-void sayString( std::string str, std::string title ) {
-    if ( bubble ) {
-        nid.cbSize = NOTIFYICONDATA_V2_SIZE;
-
-        // Set Version 5 behaviour for balloon feature
-        //nid.uVersion = NOTIFYICON_VERSION;
-        //Shell_NotifyIcon(NIM_SETVERSION, &nid);
-
-        nid.uFlags = NIF_INFO;
-        strcpy( nid.szInfo, str.c_str() );
-        strcpy( nid.szInfoTitle, title.c_str() );
-        nid.uTimeout = 10000;
-        nid.dwInfoFlags = NIF_INFO;
-        Shell_NotifyIcon( NIM_MODIFY, &nid );
-    }
-}
-*/
-
-void GUIThread( void* ) {
-    POINT p;
-    while( running ) {
-        if (GetCaretPos(&p)){
-            printf("x=%i, y=%i\n", p.x, p.y);
-        }
-        else{
-            printf("Carot not found...\n");
-        }
-
-        Sleep(500);
-
-//        time_t current;
-//        time(&current);
-//
-//        double seconds = difftime(current, time);
-    }
-}
-
 LRESULT CALLBACK windowprocedure( HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam ) {
     //printf("HERE!!!");
 
@@ -448,8 +173,6 @@ LRESULT CALLBACK windowprocedure( HWND hwnd, UINT msg, WPARAM wparam, LPARAM lpa
     HRGN region;
     RECT rect;
     HBRUSH hBrush;
-
-    HWND old;
 
     int n;
 
@@ -485,16 +208,16 @@ LRESULT CALLBACK windowprocedure( HWND hwnd, UINT msg, WPARAM wparam, LPARAM lpa
                 SendMessage(window.B[i], WM_SETFONT, (WPARAM) font, 0);
             }
 
-            menu = CreatePopupMenu();
-            AppendMenu( menu, MF_STRING | MF_DISABLED, MENU_NAME, "Frog-Keys" );
-            AppendMenu( menu, MF_SEPARATOR, 0, NULL );
-            AppendMenu( menu, MF_STRING, MENU_EXIT, "Exit" );
+            window.menu = CreatePopupMenu();
+            AppendMenu( window.menu, MF_STRING | MF_DISABLED, MENU_NAME, "Frog-Keys" );
+            AppendMenu( window.menu, MF_SEPARATOR, 0, NULL );
+            AppendMenu( window.menu, MF_STRING, MENU_EXIT, "Exit" );
             break;
         case ICON_MESSAGE:
             switch( lparam ) {
                 case WM_RBUTTONDOWN:
                     GetCursorPos( &curPoint ) ;
-                    clicked = TrackPopupMenuEx( menu, TPM_RETURNCMD | TPM_NONOTIFY, curPoint.x, curPoint.y, hwnd, NULL );
+                    clicked = TrackPopupMenuEx( window.menu, TPM_RETURNCMD | TPM_NONOTIFY, curPoint.x, curPoint.y, hwnd, NULL );
                     SendMessage( hwnd, WM_NULL, 0, 0 );
 
                     switch ( clicked ) {
@@ -533,270 +256,20 @@ LRESULT CALLBACK windowprocedure( HWND hwnd, UINT msg, WPARAM wparam, LPARAM lpa
     return DefWindowProc( hwnd, msg, wparam, lparam );
 }
 
-/*
-
-std::vector<std::string> ParseCmdLine( const char* cmdline ) {
-    char* buffer = ( char* ) malloc( strlen( cmdline ) + 1 );
-    strcpy( buffer, cmdline );
-    std::vector<std::string> args;
-    int len = strlen( cmdline );
-    int pos = 0;
-    int isquote = 0;
-    int isescaped = 0;
-    int isreading = 0;
-    for( int i = 0; i <= len; ++i ) {
-        if( !isescaped ) {
-            if( buffer[i] == '\\' ) {
-                isescaped = 1;
-                if( !isreading ) {
-                    isreading = 1;
-                    pos = i;
-                }
-                continue;
-            } else if( buffer[i] == '\"' ) {
-                if( isquote ) {
-                    buffer[i] = 0;
-                    args.push_back( buffer + pos );
-                    buffer[i] = ' ';
-                    pos = i + 1;
-                    isquote = 0;
-                    isreading = 0;
-                    continue;
-                } else {
-                    if( isreading ) {
-                        buffer[i] = 0;
-                        args.push_back( buffer + pos );
-                        buffer[i] = ' ';
-                    }
-                    pos = i + 1;
-                    isquote = 1;
-                    isreading = 0;
-                    continue;
-                }
-            } else if( isspace( buffer[i] ) || buffer[i] == 0 ) {
-                if( !isquote && isreading ) {
-                    buffer[i] = 0;
-                    args.push_back( buffer + pos );
-                    buffer[i] = ' ';
-                    isreading = 0;
-                }
-            } else {
-                if( !isreading ) {
-                    isreading = 1;
-                    pos = i;
-                }
-            }
-        } else {
-            int replacement = ' ';
-            int newpos = 1;
-            switch( buffer[i] ) {
-                case 'r': replacement = '\r'; break;
-                case 'n': replacement = '\n'; break;
-                case 't': replacement = '\t'; break;
-                case '\\': replacement = '\\'; break;
-                case 'o': sscanf( buffer + i, "o%o%n", &replacement, &newpos ); break;
-                case 'x': sscanf( buffer + i, "x%x%n", &replacement, &newpos ); break;
-                case ' ': replacement = ' '; break;
-            }
-
-            for( int j = 0; newpos + i + j - 1 < len; ++j ) {
-                buffer[i + j] = buffer[newpos + i + j];
-            }
-            len -= newpos;
-            buffer[i - 1] = replacement;
-            isescaped = 0;
-            i -= 1;
-            continue;
-        }
-    }
-    if( isreading ) {
-        args.push_back( buffer + pos );
-    }
-    free( buffer );
-    return args;
-}
-
-int HandleArgs( const char* cmdline ) {
-    std::vector< std::string > args = ParseCmdLine( cmdline );
-    if ( args.size() == 0 ) {
-        return 0;
-    }
-    HWND parent = FindWindowEx( NULL, NULL, "FrogLies", NULL );
-    if ( args[0] == "--window" ) {
-        if( parent != NULL ) {
-            PostMessage( parent, 59090, 0, 0 );
-        } else {
-            DoUpload( UPLOAD_WINDOW );
-            SetClipboard( whff.GetLastUpload() );
-        }
-        return 1;
-    }
-    if ( args[0] == "--screen" ) {
-        if( parent != NULL ) {
-            PostMessage( parent, 59091, 0, 0 );
-        } else {
-            DoUpload( UPLOAD_SCREEN );
-            SetClipboard( whff.GetLastUpload() );
-        }
-        return 1;
-    }
-    if ( args[0] == "--clip" ) {
-        if( parent != NULL ) {
-            PostMessage( parent, 59092, 0, 0 );
-        } else {
-            DoUpload( UPLOAD_CLIP );
-            SetClipboard( whff.GetLastUpload() );
-        }
-        return 1;
-    }
-    if ( args[0] == "--crop" ) {
-        int passargs[4];
-        if ( args.size() == 5 ) {
-            passargs[0] = strtol( args[1].c_str(), NULL, 10 );
-            passargs[1] = strtol( args[2].c_str(), NULL, 10 );
-            passargs[2] = strtol( args[3].c_str(), NULL, 10 );
-            passargs[3] = strtol( args[4].c_str(), NULL, 10 );
-            if ( passargs[0] == 0 || passargs[1] == 0 || passargs[2] == 0 || passargs[3] == 0 ) {
-                sayString( "Non-int CLI for crop.", "Error" );
-            }
-
-            if( parent != NULL ) {
-                PostMessage( parent, 59093, passargs[0], passargs[1] );
-                PostMessage( parent, 59094, passargs[2], passargs[3] );
-            } else {
-                Bitmap mb = GetWindow( GetDesktopWindow() );
-                mb.Crop( passargs[0], passargs[1], passargs[2], passargs[3] );
-                void* data = mb.ReadPNG();
-                if( data != 0 ) {
-                    Upload( "png", data, mb.PNGLen() );
-                    SetClipboard( whff.GetLastUpload() );
-                }
-            }
-            return 1;
-        } else {
-            printf( "Invalid number of arguments for crop.\n" );
-        }
-        return 1;
-    }
-    return 1;
-}
-
-*/
-
 int WINAPI WinMain( HINSTANCE thisinstance, HINSTANCE previnstance, LPSTR cmdline, int ncmdshow ) {
-    WNDCLASSEXW windowclass;
+    keys.load("keys.txt", "shift.txt");
 
-    windowclass.hInstance = thisinstance;
-    windowclass.lpszClassName = CLASSNAME;
-    windowclass.lpfnWndProc = windowprocedure;
-    //windowclass.style = (CS_DBLCLKS&~WS_VISIBLE) | 0x00020000;
-    windowclass.style = (CS_DBLCLKS) | 0x00020000;
-    windowclass.cbSize = sizeof( WNDCLASSEX );
-    windowclass.hIcon = LoadIcon( NULL, IDI_APPLICATION );
-    windowclass.hIconSm = LoadIcon( NULL, IDI_APPLICATION );
-    windowclass.hCursor  = NULL;
-    windowclass.lpszMenuName = NULL;
-    windowclass.cbClsExtra = 0;
-    windowclass.cbWndExtra = 0;
-    windowclass.hbrBackground =  CreateSolidBrush( RGB( 255, 255, 255 ) );
+    window.create(thisinstance, &keys, &key, &shown);
 
 //    rshift = GetKeyState(VK_RSHIFT);
 //    lshift = GetKeyState(VK_LSHIFT);
 //    shift = lshift || rshift;
-
-
-
     printf("\nCAPSLOCK: %i\n", GetKeyState(VK_CAPITAL));
     GetKeyState(VK_CAPITAL);
 
-    //PBYTE kb[256];
-    //SetKeyboardState(*kb);
-
-    if (!RegisterClassExW(&windowclass)){ printf("ERROR1"); }
-
-    window.create(thisinstance, windowclass);
-
-    FILE* f = fopen("keys.txt", "rb");
-    if (!f){ printf("FILE DOES NOT EXIST!"); return 0; }
-
-    wchar_t* str = new wchar_t[16];
-    fgetws(str, 16, f);
-
-    while (!feof(f)){
-        wchar_t* str = new wchar_t[16];
-        fgetws(str, 16, f);
-
-        int j = 16;
-        while (j){ j--; if (str[j] == 13){ str[j] = '\0'; } }
-
-        keys.push_back(str);
-//        printf("\n"); wprintf(str); printf("\n");
-//        for (int k = 0; k < 16 && str[k]; k++){ printf("%i, ", (int)str[k]);  }
-//        printf("\n");
-    }
-
-    fclose(f);
-
-    f = fopen("shift.txt", "rb");
-    if (!f){ printf("FILE DOES NOT EXIST!"); return -1; }
-
-    str = new wchar_t[16];
-    fgetws(str, 16, f);
-
-    while (!feof(f)){
-        str = new wchar_t[16];
-        fgetws(str, 16, f);
-
-        int j = 16;
-        while (j){ j--; if (str[j] == 13){ str[j] = '\0'; } }
-
-        shiftkeys.push_back(str);
-//        printf("\n"); wprintf(str); printf("\n");
-//        for (int k = 0; k < 16 && str[k]; k++){ printf("%i, ", (int)str[k]);  }
-//        printf("\n");
-    }
-
-    fclose(f);
-
-    if ((char)keys[0][0] != 'k'){ printf("INVALID FILE!"); return 0; }
-    if ((char)shiftkeys[0][0] != 'K'){ printf("INVALID FILE!"); return -1; }
-
-//    wchar_t str1[256];
-//    wchar_t* str2 = str1;
-//
-//    for (int i = 0; i < keys.size(); i++){
-//        str2 += swprintf(str2, L"%ls\n", keys[i]);
-//    }
-//
-//    wprintf(str1);
-//
-//    MessageBoxW(NULL, str1, L"Testing...", MB_OK);
-
-    window.hide();
-
-    icon = LoadIcon(thisinstance, MAKEINTRESOURCE(2));
-
-    NOTIFYICONDATAW nid;
-
-    nid.cbSize = sizeof( NOTIFYICONDATA );
-    nid.uID = 100;
-    nid.hWnd = window.hwnd;
-    //nid.uVersion = NOTIFYICON_VERSION;
-    nid.uCallbackMessage = ICON_MESSAGE;
-    nid.hIcon = icon; //= LoadIcon(NULL, IDI_APPLICATION);
-    swprintf( nid.szTip, L"Frog-keys" );
-    nid.uFlags = NIF_MESSAGE | NIF_ICON | NIF_TIP;
-
-    Shell_NotifyIconW( NIM_ADD, &nid );
-
-    kHook = SetWindowsHookEx( WH_KEYBOARD_LL, (HOOKPROC)handlekeys, window.modulehandle, 0 );
+    kHook = SetWindowsHookEx(WH_KEYBOARD_LL, (HOOKPROC)handlekeys, window.modulehandle, 0);
 
     running = true;
-
-    //sayString( "started...", "Startup" );
-
-    //_beginthread( GUIThread, 1000, NULL );
-    //GUIThread(0);
 
     while ( running ) {
         if ( !GetMessage( &msg, NULL, 0, 0 ) ) {
@@ -806,30 +279,11 @@ int WINAPI WinMain( HINSTANCE thisinstance, HINSTANCE previnstance, LPSTR cmdlin
         DispatchMessage( &msg );
     }
 
-    Shell_NotifyIconW( NIM_DELETE, &nid );
+    Shell_NotifyIconW(NIM_DELETE, &window.iconData);
 
     Sleep(500);
 
     return 0;
 }
 
-#ifdef DEBUGMALLOCS
-#undef malloc(a)
-#undef free(a)
-#undef realloc(a,b)
 
-void* DMALLOC( size_t a, int line, const char* name ) {
-    void *r = malloc( a );
-    printf( "MALLOC %X (%d) on line %d of %s\n", r, a, line, name );
-    return r;
-}
-void DFREE( void* a, int line, const char* name ) {
-    free( a );
-    printf( "FREE %X on line %d of %s\n", a, line, name );
-}
-void* DREALLOC( void*a, size_t b, int line, const char*name ) {
-    void* ret = realloc( a, b );
-    printf( "REALLOC from %X to %X (%d) on line %d of %s\n", a, ret, b, line, name );
-    return ret;
-}
-#endif
