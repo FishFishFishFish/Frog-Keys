@@ -97,6 +97,7 @@ struct WINDOW{
 
     HWND hwnd;
     POINT cursor;
+    RECT cursorRect;
     HWND cursorWnd;
     HWND cursorParentWnd;
     POINT topLeft;
@@ -192,16 +193,16 @@ void WINDOW::show(){
 
         GetGUIThreadInfo(NULL, &info);
 
-        RECT rect = info.rcCaret;
+        cursorRect = info.rcCaret;
 
         RECT rectWnd;
 
         GetWindowRect(info.hwndCaret, &rectWnd);
 
-        cursor.x = rectWnd.left + (rect.left + rect.right)/2;
-        cursor.y = rectWnd.top  + (rect.bottom + rect.top)/2;
+        cursor.x = rectWnd.left + (cursorRect.left + cursorRect.right)/2;
+        cursor.y = rectWnd.top  + (cursorRect.bottom + cursorRect.top)/2;
 
-        int h = (rect.bottom - rect.top)/2;
+        int h = (cursorRect.bottom - cursorRect.top)/2;
 
 //        printf("l=%i, r=%i, t=%i, b=%i\n", rect.left, rect.right, rect.top, rect.bottom);
 //        printf("x=%i, y=%i\n", cursor.x, cursor.y);
@@ -332,7 +333,10 @@ LRESULT CALLBACK handlekeys( int code, WPARAM wp, LPARAM lp ) {
                         info.cbSize = sizeof(GUITHREADINFO);
                         GetGUIThreadInfo(NULL, &info);
 
-                        if (window.cursorWnd == info.hwndCaret){ replaceChar(shown[num]); }
+                        RECT R = window.cursorRect;
+                        RECT r = info.rcCaret;
+
+                        if (window.cursorWnd == info.hwndCaret && R.top == r.top && R.bottom == r.bottom && R.right == r.right && R.left == r.left){ replaceChar(shown[num]); }
 
                         key = '\0';
                         shown = NULL;
