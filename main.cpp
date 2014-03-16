@@ -1,5 +1,10 @@
 #undef __STRICT_ANSI__
+#define _UNICODE
+
+//#pragma comment(linker,"/manifestdependency:\"type='win32' name='Microsoft.Windows.Common-Controls' version='6.0.0.0' processorArchitecture='*' publicKeyToken='6595b64144ccf1df' language='*'\"")
+
 #define WINVER 0x0501
+#define _WIN32_WINNT 0x0501
 #define WIN32_LEAN_AND_MEAN
 //#define NOWINABLE
 
@@ -25,13 +30,11 @@
 #include <windows.h>
 #include <winuser.h>
 
-WINUSERAPI BOOL WINAPI GetGUIThreadInfo(DWORD,LPGUITHREADINFO);
-
 //#include <mmsystem.h>
 //#include <Windowsx.h>
 //#include <commctrl.h>
 //#include <shellapi.h>
-//#include <Shlwapi.h>
+#include <Shlwapi.h>
 //#include <process.h>
 //#include <Winuser.h>
 //#include <direct.h>
@@ -44,8 +47,14 @@ WINUSERAPI BOOL WINAPI GetGUIThreadInfo(DWORD,LPGUITHREADINFO);
 #define BUTTON_P 02
 #define DISTANCE 10
 
-#define CLASSNAME       "KeyPress"
-#define WINDOWTITLE     "KeyPress"
+#define ICON_MESSAGE    (WM_USER + 1)
+
+#define MENU_NAME 3000
+#define MENU_EXIT 3001
+
+#define CLASSNAME       L"KeyPress"
+#define WINDOWTITLE     L"KeyPress"
+
 
 std::vector<wchar_t*> keys;
 std::vector<wchar_t*> shiftkeys;
@@ -53,6 +62,10 @@ std::vector<wchar_t*> shiftkeys;
 bool lshift;
 bool rshift;
 bool shift;
+
+HICON icon;
+
+HMENU menu;
 
 char key;
 wchar_t* shown;
@@ -88,12 +101,12 @@ struct WINDOW{
     bool under;
     //MSG msg;
 
-    WNDCLASSEX windowclass;
+    WNDCLASSEXW windowclass;
     HINSTANCE modulehandle;
     HRGN region;
     int arrowOff;
 
-    void create(HINSTANCE thisinstance, WNDCLASSEX windowclass);
+    void create(HINSTANCE thisinstance, WNDCLASSEXW windowclass);
     void setRegion();
     void setButtons();
     void show();
@@ -102,10 +115,10 @@ struct WINDOW{
 
 //#include "window.h"
 
-void WINDOW::create(HINSTANCE thisinstance, WNDCLASSEX windowclass){
+void WINDOW::create(HINSTANCE thisinstance, WNDCLASSEXW windowclass){
     HWND fgwindow = GetForegroundWindow();
 
-    hwnd = CreateWindowEx( WS_EX_TOOLWINDOW, CLASSNAME, WINDOWTITLE, WS_EX_LAYERED| WS_CLIPSIBLINGS | WS_CHILD,
+    hwnd = CreateWindowExW( WS_EX_TOOLWINDOW, CLASSNAME, WINDOWTITLE, WS_EX_LAYERED| WS_CLIPSIBLINGS | WS_CHILD,
                            CW_USEDEFAULT, CW_USEDEFAULT, 200, 200, GetDesktopWindow(), NULL, //HWND_DESKTOP
                            thisinstance, NULL );
 
@@ -121,7 +134,7 @@ void WINDOW::create(HINSTANCE thisinstance, WNDCLASSEX windowclass){
 }
 void WINDOW::setRegion(){
     //region = CreateRoundRectRgn(0, 0, width, BUTTON_H + 2*BUTTON_P, BUTTON_P, BUTTON_P);
-    HRGN rect = CreateRoundRectRgn(0, 0, width, BUTTON_H + 2*BUTTON_P, BUTTON_P, 4*BUTTON_P);
+    HRGN rect = CreateRoundRectRgn(0, 0, width, BUTTON_H + 2*BUTTON_P, 4*BUTTON_P, 4*BUTTON_P);
     //HRGN rect = CreateRoundRectRgn(topLeft.x, topLeft.y, topLeft.x + width, topLeft.y + BUTTON_H + 2*BUTTON_P, BUTTON_P, BUTTON_P);
 
     POINT p1, p2, p3;
@@ -188,11 +201,9 @@ void WINDOW::show(){
 
         int h = (rect.bottom - rect.top)/2;
 
-        printf("l=%i, r=%i, t=%i, b=%i\n", rect.left, rect.right, rect.top, rect.bottom);
-
-        printf("x=%i, y=%i\n", cursor.x, cursor.y);
-
-        printf("h=%i\n", h);
+//        printf("l=%i, r=%i, t=%i, b=%i\n", rect.left, rect.right, rect.top, rect.bottom);
+//        printf("x=%i, y=%i\n", cursor.x, cursor.y);
+//        printf("h=%i\n", h);
 
         cursorWnd = info.hwndCaret;
 
@@ -214,8 +225,6 @@ void WINDOW::show(){
         topLeft.x = cursor.x - width/2;
         topLeft.y = cursor.y + (under)*(h + BUTTON_P + DISTANCE) - (!under)*(h + BUTTON_H + BUTTON_P + DISTANCE);
 
-
-
 //        topLeft.x = 0;
 //        topLeft.y = 0;
 
@@ -224,9 +233,9 @@ void WINDOW::show(){
         SetWindowPos(hwnd, HWND_TOPMOST, topLeft.x, topLeft.y,  width, BUTTON_H + 2*BUTTON_P, SWP_SHOWWINDOW);
 
         setButtons();
-        //setRegion();
+        setRegion();
 
-        RedrawWindow(hwnd, NULL, region, RDW_INVALIDATE);
+        //RedrawWindow(hwnd, NULL, region, RDW_INVALIDATE);
         UpdateWindow(hwnd);
 
         for (int i = 0; i < 8; i++){
@@ -429,29 +438,53 @@ LRESULT CALLBACK windowprocedure( HWND hwnd, UINT msg, WPARAM wparam, LPARAM lpa
     int n;
 
     switch ( msg ) {
-        case WM_ERASEBKGND:
-            return (LRESULT)1;
-        case WM_PAINT:
-            hdc = BeginPaint(hwnd, &ps);
-
-//            GetClientRect(hwnd, &rect);
-//            region = CreateRectRgnIndirect(&rect);
-//            hBrush = CreateSolidBrush(RGB(255,255,255));
-//            FillRgn(hdc, region, hBrush);
-
-            FillRgn(hdc, window.region, CreateSolidBrush(RGB(255,255,255)));
-            FrameRgn(hdc, window.region, CreateSolidBrush(RGB(200,200,200)),2,2);
-
-            EndPaint(hwnd, &ps);
-            break;
+//        case WM_ERASEBKGND:
+//            return (LRESULT)1;
+//        case WM_PAINT:
+//            hdc = BeginPaint(hwnd, &ps);
+//
+////            GetClientRect(hwnd, &rect);
+////            region = CreateRectRgnIndirect(&rect);
+////            hBrush = CreateSolidBrush(RGB(255,255,255));
+////            FillRgn(hdc, region, hBrush);
+//
+//            FillRgn(hdc, window.region, CreateSolidBrush(RGB(255,255,255)));
+//            FrameRgn(hdc, window.region, CreateSolidBrush(RGB(200,200,200)),2,2);
+//
+//            EndPaint(hwnd, &ps);
+//            break;
         case WM_CLOSE:
-            break;
+            running = false;
+            DestroyWindow(window.hwnd);
+            return 0;
         case WM_CREATE:
             for (int i = 0; i < 8; i++){
-                window.B[i] = CreateWindowEx(0, "BUTTON", " ", BS_DEFPUSHBUTTON | WS_CHILD | WS_VISIBLE | BS_MULTILINE,
+                window.B[i] = CreateWindowExW(0, L"BUTTON", L" ", BS_DEFPUSHBUTTON | WS_CHILD | WS_VISIBLE | BS_MULTILINE,
                                              BUTTON_P + (BUTTON_P + BUTTON_W)*i, BUTTON_P, BUTTON_W, BUTTON_H,
                                              hwnd,(HMENU)B_[i], GetModuleHandle(NULL), NULL);
             }
+
+            menu = CreatePopupMenu();
+            AppendMenu( menu, MF_STRING | MF_DISABLED, MENU_NAME, "Frog-Keys" );
+            AppendMenu( menu, MF_SEPARATOR, 0, NULL );
+            AppendMenu( menu, MF_STRING, MENU_EXIT, "Exit" );
+            break;
+        case ICON_MESSAGE:
+            switch( lparam ) {
+                case WM_RBUTTONDOWN:
+                    GetCursorPos( &curPoint ) ;
+                    clicked = TrackPopupMenuEx( menu, TPM_RETURNCMD | TPM_NONOTIFY, curPoint.x, curPoint.y, hwnd, NULL );
+                    SendMessage( hwnd, WM_NULL, 0, 0 );
+
+                    switch ( clicked ) {
+                        case MENU_EXIT:
+                            PostMessage( hwnd, WM_CLOSE, 0, 0 );
+                            break;
+                        default:
+                            return DefWindowProc( hwnd, msg, wparam, lparam );
+                    };
+                    break;
+            };
             break;
         case WM_SETFOCUS:
             SetFocus((HWND)wparam);
@@ -630,7 +663,7 @@ int HandleArgs( const char* cmdline ) {
 */
 
 int WINAPI WinMain( HINSTANCE thisinstance, HINSTANCE previnstance, LPSTR cmdline, int ncmdshow ) {
-    WNDCLASSEX windowclass;
+    WNDCLASSEXW windowclass;
 
     windowclass.hInstance = thisinstance;
     windowclass.lpszClassName = CLASSNAME;
@@ -644,9 +677,9 @@ int WINAPI WinMain( HINSTANCE thisinstance, HINSTANCE previnstance, LPSTR cmdlin
     windowclass.lpszMenuName = NULL;
     windowclass.cbClsExtra = 0;
     windowclass.cbWndExtra = 0;
-    windowclass.hbrBackground =  CreateSolidBrush( RGB( 0, 0, 255 ) );
+    windowclass.hbrBackground =  CreateSolidBrush( RGB( 255, 255, 255 ) );
 
-    if (!RegisterClassEx(&windowclass)){ printf("ERROR1"); }
+    if (!RegisterClassExW(&windowclass)){ printf("ERROR1"); }
 
     window.create(thisinstance, windowclass);
 
@@ -708,6 +741,21 @@ int WINAPI WinMain( HINSTANCE thisinstance, HINSTANCE previnstance, LPSTR cmdlin
 
     window.hide();
 
+    icon = LoadIcon(thisinstance, MAKEINTRESOURCE(2));
+
+    NOTIFYICONDATAW nid;
+
+    nid.cbSize = sizeof( NOTIFYICONDATA );
+    nid.uID = 100;
+    nid.hWnd = window.hwnd;
+    //nid.uVersion = NOTIFYICON_VERSION;
+    nid.uCallbackMessage = ICON_MESSAGE;
+    nid.hIcon = icon; //= LoadIcon(NULL, IDI_APPLICATION);
+    swprintf( nid.szTip, L"Frog-keys" );
+    nid.uFlags = NIF_MESSAGE | NIF_ICON | NIF_TIP;
+
+    Shell_NotifyIconW( NIM_ADD, &nid );
+
     kHook = SetWindowsHookEx( WH_KEYBOARD_LL, (HOOKPROC)handlekeys, window.modulehandle, 0 );
 
     running = true;
@@ -725,7 +773,7 @@ int WINAPI WinMain( HINSTANCE thisinstance, HINSTANCE previnstance, LPSTR cmdlin
         DispatchMessage( &msg );
     }
 
-    //Shell_NotifyIcon( NIM_DELETE, &nid );
+    Shell_NotifyIconW( NIM_DELETE, &nid );
 
     return 0;
 }
