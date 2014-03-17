@@ -62,6 +62,7 @@ void replaceChar(wchar_t unicode){
 
 LRESULT CALLBACK handlekeys( int code, WPARAM wp, LPARAM lp ) {
     if (code == HC_ACTION && ( (wp == WM_SYSKEYUP || wp == WM_KEYUP) || (wp == WM_SYSKEYDOWN || wp == WM_KEYDOWN) )){
+        //printf("MESSAGE!\n");
         char tmp[0xFF] = {'\0'};
         DWORD msg = 1;
         KBDLLHOOKSTRUCT st_hook = *( ( KBDLLHOOKSTRUCT* )lp );
@@ -267,7 +268,7 @@ int WINAPI WinMain( HINSTANCE thisinstance, HINSTANCE previnstance, LPSTR cmdlin
     printf("\nCAPSLOCK: %i\n", GetKeyState(VK_CAPITAL));
     GetKeyState(VK_CAPITAL);
 
-    kHook = SetWindowsHookEx(WH_KEYBOARD_LL, (HOOKPROC)handlekeys, window.modulehandle, 0);
+    kHook = SetWindowsHookEx(WH_KEYBOARD_LL, (HOOKPROC)handlekeys, NULL, 0); //window.modulehandle
 
     running = true;
 

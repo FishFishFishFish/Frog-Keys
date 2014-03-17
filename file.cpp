@@ -7,7 +7,7 @@ int loadFile(char* name, std::vector<wchar_t*>* out, wchar_t** command=NULL){
     wchar_t* str = new wchar_t[16];
     fgetws(str, 16, f);
 
-    if (!(*command)){
+    if (command){
         (*command) = new wchar_t[16];
         fgetws(*command, 16, f);
     }
@@ -15,7 +15,7 @@ int loadFile(char* name, std::vector<wchar_t*>* out, wchar_t** command=NULL){
         fgetws(str, 16, f);
     }
 
-    delete str;
+    //delete str;
 
     while (!feof(f)){
         wchar_t* str = new wchar_t[16];
@@ -32,13 +32,14 @@ int loadFile(char* name, std::vector<wchar_t*>* out, wchar_t** command=NULL){
 
     fclose(f);
 
-    if ((char)(*out)[0][0] != 'k'){ printf("INVALID FILE!"); return 0; }
+    //if ((char)((*out)[0][0]) != 'k' || (char)((*out)[0][0]) != 'K'){ printf("INVALID FILE!"); return 0; }
 
     return 1;
 }
 
 int KEYS::load(char* lowerf, char* upperf){
-    return loadFile(lowerf, &lower, &command) && loadFile(upperf, &upper);
+    loadFile(lowerf, &lower, &command);
+    loadFile(upperf, &upper);
 }
 
 void KEYS::search(bool isUpper, int key, wchar_t** shown){

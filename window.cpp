@@ -108,7 +108,10 @@ void WINDOW::show(){
         GUITHREADINFO info;
         info.cbSize = sizeof(GUITHREADINFO);
 
-        GetGUIThreadInfo(NULL, &info);
+        bool b = GetGUIThreadInfo(NULL, &info);
+
+        if (b){ printf("TRUE"); }
+        else{ printf("FALSE"); }
 
         cursorRect = info.rcCaret;
 
@@ -121,34 +124,34 @@ void WINDOW::show(){
 
         int h = (cursorRect.bottom - cursorRect.top)/2;
 
-//        printf("l=%i, r=%i, t=%i, b=%i\n", rect.left, rect.right, rect.top, rect.bottom);
-//        printf("x=%i, y=%i\n", cursor.x, cursor.y);
-//        printf("h=%i\n", h);
+        printf("l=%i, r=%i, t=%i, b=%i\n", cursorRect.left, cursorRect.right, cursorRect.top, cursorRect.bottom);
+        printf("l=%i, r=%i, t=%i, b=%i\n", rectWnd.left, rectWnd.right, rectWnd.top, rectWnd.bottom);
+        //printf("x=%i, y=%i\n", cursor.x, cursor.y);
+        //printf("h=%i\n", h);
 
         cursorWnd = info.hwndCaret;
         cursorParentWnd = info.hwndActive;
 
+        width = num*(BUTTON_W + BUTTON_P) - BUTTON_P + 2*BUTTON_O;
+
         if (!cursorWnd){
             printf("NO WINDOW!");
-            (*key) = '\0';
-            (*shown) = NULL;
-            hide();
-            return;
+//            (*key) = '\0';
+//            (*shown) = NULL;
+//            hide();
+            topLeft.x = 0;
+            topLeft.y = 0;
+            //return;
         }
         else{
             //SetForegroundWindow(cursorWnd);
             SetForegroundWindow(cursorParentWnd);
+
+            under = (cursor.y < 2*BUTTON_H);
+
+            topLeft.x = cursor.x - width/2;
+            topLeft.y = cursor.y + (under)*(h + DISTANCE) - (!under)*(h + BUTTON_H + 2*BUTTON_O + DISTANCE);
         }
-
-        under = (cursor.y < 2*BUTTON_H);
-
-        width = num*(BUTTON_W + BUTTON_P) - BUTTON_P + 2*BUTTON_O;
-
-        topLeft.x = cursor.x - width/2;
-        topLeft.y = cursor.y + (under)*(h + DISTANCE) - (!under)*(h + BUTTON_H + 2*BUTTON_O + DISTANCE);
-
-//        topLeft.x = 0;
-//        topLeft.y = 0;
 
         ShowWindow(hwnd, SW_SHOW);
 
