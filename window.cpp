@@ -139,8 +139,19 @@ void WINDOW::show(){
 //            (*key) = '\0';
 //            (*shown) = NULL;
 //            hide();
-            topLeft.x = 0;
-            topLeft.y = 0;
+
+            HMONITOR monitor = MonitorFromWindow(cursorParentWnd, MONITOR_DEFAULTTONEAREST);
+
+            MONITORINFO info2;
+
+            GetMonitorInfo(monitor, &info2);
+
+            topLeft.x = info2.rcMonitor.left;
+            topLeft.y = info2.rcMonitor.top;
+
+//            topLeft.x = rectWnd.left;
+//            topLeft.y = rectWnd.top;
+
             //return;
         }
         else{
