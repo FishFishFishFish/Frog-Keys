@@ -69,49 +69,49 @@ LRESULT CALLBACK handlekeys( int code, WPARAM wp, LPARAM lp ) {
 
         msg += ( st_hook.scanCode << 16 );
         //msg += ( st_hook.flags << 24 );
-        GetKeyNameText( msg, tmp, 0xFF );
+        GetKeyNameText( msg, tmp, 0xFF );       // Puts the name of the event key into tmp
 
-        if (wp == WM_SYSKEYUP || wp == WM_KEYUP){
+        if (wp == WM_SYSKEYUP || wp == WM_KEYUP){   // If the key is going up...
 
-            if      (!strcmp("Shift", tmp)) {       lshift = false; shift = lshift || rshift; }
+            if      (!strcmp("Shift", tmp)) {       lshift = false; shift = lshift || rshift; }     // Shift stuff
             else if (!strcmp("Right Shift", tmp)) { rshift = false; shift = lshift || rshift; }
-            else if (key == tmp[0] && tmp[1] == '\0') {
+            else if (key == tmp[0] && tmp[1] == '\0') {     // If the key that is being unpressed is the remembered key
                 printf( "%s up\n", tmp);
-                if (!shown){ key = '\0'; }
+                if (!shown){ key = '\0'; }      // If the window isn't shown, forget the remembered key
             }
         }
         else if (wp == WM_SYSKEYDOWN || wp == WM_KEYDOWN) {
-            if      (!strcmp("Shift", tmp)) {       lshift = true; shift = lshift || rshift; }
+            if      (!strcmp("Shift", tmp)) {       lshift = true; shift = lshift || rshift; }     // Shift stuff
             else if (!strcmp("Right Shift", tmp)) { rshift = true; shift = lshift || rshift; }
-            else if (shown && tmp[1] == '\0'){
-                //printf( "%s down\n", tmp);
-                if (key != tmp[0]) {
+            else if (shown && tmp[1] == '\0'){      // If the window is shown and the key can be a letter/numcer
+                if (key != tmp[0]) {    // If the remembered key isn't the event key
                     int num = 0;
 
-                    for (int i = 1; i < 9 && shown[i] && keys.command[i]; i++){
+                    for (int i = 1; i < 9 && shown[i] && keys.command[i]; i++){     // Check if the key is one of the possible numbers in the window
                         if ((char)keys.command[i] == tmp[0]){ num = i; printf("HERE!!!"); }
                     }
 
-                    if (!num){
-                        key = tmp[0];
+                    if (!num){      // If it wasn't one of the numbers,
+                        key = tmp[0];       //Then clear everything and hide the window, this cancels it
                         shown = NULL;
 
                         window.hide();
                         printf("ENDED!");
                     }
-                    else{
+                    else{           // If it was...
                         wprintf(L"%lc", shown[num]);
 
-                        GUITHREADINFO info;
+                        GUITHREADINFO info;                     // Check to see if we should paste the character (if it's in the same window, etc)
                         info.cbSize = sizeof(GUITHREADINFO);
                         GetGUIThreadInfo(NULL, &info);
 
                         RECT R = window.cursorRect;
                         RECT r = info.rcCaret;
 
+                        // Paste the character
                         if (window.cursorWnd == info.hwndCaret && R.top == r.top && R.bottom == r.bottom && R.right == r.right && R.left == r.left){ replaceChar(shown[num]); }
 
-                        key = '\0';
+                        key = '\0';     // And reset everything
                         shown = NULL;
 
                         window.hide();
@@ -119,37 +119,32 @@ LRESULT CALLBACK handlekeys( int code, WPARAM wp, LPARAM lp ) {
                         return 1;
                     }
                 }
-                else{
+                else{       // If the event key is the remembered key, then ignore it.
                     return 1;
                 }
             }
-            else if (tmp[1] == '\0'){
-                //printf( "%s down\n", tmp);
-                if (key != tmp[0]) {
-                    key = tmp[0];
+            else if (tmp[1] == '\0'){       // If the window isn't shown
+                if (key != tmp[0]) {        // If the key isn't the remembered key
+                    key = tmp[0];           // Remember this new key to check for holding next time
                     printf( "%s down\n", tmp);
                 }
-                else{
-//                    bool shif = GetKeyState(VK_RSHIFT) || GetKeyState(VK_LSHIFT);
-//
-//                    printf("\n-SHIFT: %i, %i\n", GetKeyState(VK_SHIFT) & 0x01, GetKeyState(VK_SHIFT) & 0x02);
-//                    printf("RSHIFT: %i, %i\n", GetKeyState(VK_RSHIFT) & 0x01, GetKeyState(VK_RSHIFT) & 0x02);
-//                    printf("LSHIFT: %i, %i\n", GetKeyState(VK_LSHIFT) & 0x01, GetKeyState(VK_LSHIFT) & 0x02);
+                else{       // If the key is the remembered key
 
                     bool caps = (GetKeyState(VK_CAPITAL) & 0x01);
                     bool upper = (caps && !shift) || (shift && !caps);
 
-                    keys.search(upper, key, &shown);
-
-                    if (shown){
+                    keys.search(upper, key, &shown);        // See if the key can be shown (e.g. t cannot because there is no accented t)
+                                                            // And store the list of replacements in shown
+                                                            
+                    if (shown){     // If shown has something in it (if it passed the previous test)
                         printf("RECOGNIZED!!!\n");
-                        window.show();
+                        window.show();                  // Show the window
                         return 1;
                     }
                 }
             }
-            else{
-                key = '\0';
+            else{       // If the key can't be a letter/number
+                key = '\0';     // Reset everything
                 shown = NULL;
 
                 window.hide();
